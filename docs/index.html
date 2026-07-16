@@ -30,7 +30,13 @@
     --cat-ai-ml: #f26d6d;
   }
   * { box-sizing: border-box; margin: 0; }
-  html, body { height: 100%; overflow: hidden; }
+  html, body {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     background: var(--bg);
     color: var(--text);
@@ -41,7 +47,14 @@
     background-size: 48px 48px;
   }
 
-  #viewport { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+  #viewport {
+    position: fixed;
+    inset: 0;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
   #viewport.panning { cursor: grabbing; }
   #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
   #edges { position: absolute; top: 0; left: 0; overflow: visible; }
@@ -115,6 +128,7 @@
     width: 34px; height: 34px;
     border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
+    background: rgba(95, 191, 130, 0.12);
     background: color-mix(in srgb, var(--cat) 16%, transparent);
     color: var(--cat);
     font-size: 19px;
@@ -131,6 +145,7 @@
   }
   .node.project {
     background: var(--project-bg);
+    border-color: rgba(95, 191, 130, 0.5);
     border-color: color-mix(in srgb, var(--cat) 50%, transparent);
   }
   .node.project::before {
@@ -138,10 +153,12 @@
     position: absolute; top: -9px; left: 12px;
     font-family: "JetBrains Mono", monospace;
     font-size: 9px; letter-spacing: 0.18em;
+    color: #2f6d48;
     color: color-mix(in srgb, var(--cat) 70%, #1c2a20);
     background: #e2f5e9;
     padding: 1px 7px;
-    border: 1px solid color-mix(in srgb, var(--cat) 45%, transparent);
+    border: 1px solid rgba(95, 191, 130, 0.45);
+    border-color: color-mix(in srgb, var(--cat) 45%, transparent);
     border-radius: 99px;
   }
 
@@ -162,6 +179,7 @@
     border: 1px solid var(--panel-border);
     border-radius: 14px;
     padding: 18px;
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     display: none;
   }
@@ -170,6 +188,7 @@
   #info .chip {
     flex: none; width: 40px; height: 40px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
+    background: rgba(95, 191, 130, 0.12);
     background: color-mix(in srgb, var(--cat) 16%, transparent);
     color: var(--cat); font-size: 22px;
   }
@@ -229,6 +248,7 @@
   #brand { top: 20px; left: 24px; display: flex; align-items: center; gap: 12px; }
   #brand .logo {
     width: 34px; height: 34px; border-radius: 9px;
+    background: rgba(95, 191, 130, 0.14);
     background: color-mix(in srgb, var(--accent) 16%, transparent);
     color: var(--accent);
     display: flex; align-items: center; justify-content: center; font-size: 18px;
@@ -274,9 +294,55 @@
     pointer-events: none;
     transition: opacity 0.6s;
   }
+  #tree-error {
+    position: fixed;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100vw - 40px));
+    padding: 18px;
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+    display: none;
+  }
+  #tree-error a { color: var(--accent); }
   @media (max-width: 720px) {
     #legend { display: none; }
     #brand .sub { display: none; }
+    #brand {
+      top: calc(12px + env(safe-area-inset-top));
+      left: calc(14px + env(safe-area-inset-left));
+    }
+    #docs-link {
+      top: calc(14px + env(safe-area-inset-top));
+      right: calc(14px + env(safe-area-inset-right));
+      padding: 7px 10px;
+      font-size: 11px;
+    }
+    #info {
+      top: auto;
+      left: calc(12px + env(safe-area-inset-left));
+      right: calc(12px + env(safe-area-inset-right));
+      bottom: calc(60px + env(safe-area-inset-bottom));
+      width: auto;
+      max-width: none;
+      max-height: min(58dvh, 480px);
+      padding: 16px;
+    }
+    #zoom {
+      right: calc(14px + env(safe-area-inset-right));
+      bottom: calc(34px + env(safe-area-inset-bottom));
+    }
+    #hscroll {
+      left: calc(14px + env(safe-area-inset-left));
+      right: calc(70px + env(safe-area-inset-right));
+      bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    #hint { display: none; }
   }
 </style>
 </head>
@@ -302,6 +368,7 @@
 </div>
 <div class="hud" id="hint">scroll or drag the bar to travel · click a node for details</div>
 <div id="hscroll"><div id="hthumb"></div></div>
+<div id="tree-error"></div>
 
 <aside id="info" role="dialog" aria-label="Node details">
   <button class="close" aria-label="Close"><i class="ti ti-x"></i></button>
@@ -323,6 +390,19 @@
 <script>
 (async function () {
   "use strict";
+
+  function showTreeError(message) {
+    const error = document.getElementById("tree-error");
+    error.innerHTML = message;
+    error.style.display = "block";
+  }
+
+  if (typeof ELK === "undefined") {
+    showTreeError(
+      'The tech tree could not load its layout engine. Check your connection or open the <a href="about/">about page</a>.'
+    );
+    return;
+  }
 
   const BASE = "";
   const NODE_W = 236, NODE_H = 62;
@@ -591,7 +671,7 @@
   const track = document.getElementById("hscroll");
   const thumb = document.getElementById("hthumb");
   let scale = 1, tx = 0, ty = 0;
-  const MIN_S = 0, MAX_S = 1.5, PAD = 40;
+  const MIN_S = 0.35, MAX_S = 1.5, PAD = 40;
 
   function clamp() {
     const vw = viewport.clientWidth, vh = viewport.clientHeight;
@@ -658,7 +738,7 @@
     if (e.target.closest(".node")) return;
     if (selected) closeInfo();
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    viewport.setPointerCapture(e.pointerId);
+    if (viewport.setPointerCapture) viewport.setPointerCapture(e.pointerId);
     viewport.classList.add("panning");
   });
   viewport.addEventListener("pointermove", e => {
@@ -690,7 +770,7 @@
     e.stopPropagation();
     barDrag = { startX: e.clientX, startTx: tx };
     thumb.classList.add("drag");
-    thumb.setPointerCapture(e.pointerId);
+    if (thumb.setPointerCapture) thumb.setPointerCapture(e.pointerId);
   });
   thumb.addEventListener("pointermove", e => {
     if (!barDrag) return;
