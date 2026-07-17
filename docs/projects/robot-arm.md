@@ -4,7 +4,7 @@ title: "Build a Robot Arm"
 type: project
 category: ai-ml
 tree_icon: robot
-prerequisites: [circuits, python-basics, mechanical-fundamentals, 3d-printing, kinematics, sensor-station]
+prerequisites: [circuits, python-basics, mechanical-fundamentals, 3d-printing, motor-control, kinematics, sensor-station]
 video: https://www.youtube.com/playlist?list=PLA91EvK7Dr_t3BMHld1zLkzEQFPPG1A56
 thumbnail: https://i.ytimg.com/vi/c6mrcNEFBoA/mqdefault.jpg
 ---

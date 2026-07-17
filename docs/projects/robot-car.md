@@ -4,7 +4,7 @@ title: "Autonomous Robot Car"
 type: project
 category: ai-ml
 tree_icon: car
-prerequisites: [ros2-basics, computer-vision, slam, circuits]
+prerequisites: [ros2-basics, computer-vision, slam, motor-control]
 video: https://www.youtube.com/playlist?list=PLA91EvK7Dr_uZfC8QRWU6ETB3tA66958w
 ---
 

@@ -6,7 +6,7 @@ category: electronics
 tree_icon: antenna
 videos:
   - https://youtu.be/bIORcJLHV3k
-prerequisites: [blink-led, data-fundamentals]
+prerequisites: [blink-led, sensors, data-fundamentals]
 ---
 
 # Project: Sensor Station

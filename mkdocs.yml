@@ -2,6 +2,11 @@ site_name: Back To Engineering
 site_url: https://www.backtoengineering.com/
 site_description: Learn robotics and AI through a dependency tree of topics and hands-on projects.
 
+repo_url: https://github.com/Gh0stlyKn1ght/backtoengineering
+repo_name: Gh0stlyKn1ght/backtoengineering
+
+copyright: Maintained by <a href="https://github.com/Gh0stlyKn1ght">Gh0stlyKn1ght</a>
+
 theme:
   name: material
   logo: assets/branding/Back To Engineering logo_I-5.png
@@ -29,6 +34,12 @@ markdown_extensions:
 hooks:
   - scripts/hooks.py
 
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Gh0stlyKn1ght/backtoengineering
+      name: Gh0stlyKn1ght on GitHub
+
 extra_css:
   - css/custom.css
 
@@ -44,6 +55,10 @@ nav:
   - Electronics:
     - Electronics Fundamentals: topics/electronics-fundamentals.md
     - Circuits: topics/circuits.md
+    - Power Systems: topics/power-systems.md
+    - Microcontrollers: topics/microcontrollers.md
+    - Sensors: topics/sensors.md
+    - Motor Control: topics/motor-control.md
   - Mechanical:
     - Mechanical Fundamentals: topics/mechanical-fundamentals.md
     - CAD: topics/cad.md

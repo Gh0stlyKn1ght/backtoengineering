@@ -1,6 +1,12 @@
 # Build Process & Architecture
 
-This document tracks the collaborative build process with Claude and the architectural decisions made for the Robotics & AI Tech Tree learning site.
+This document tracks the collaborative build process with Claude and the architectural decisions made for the Back To Engineering tech tree learning site.
+
+## Maintainer & Credits
+
+- **Maintainer**: [Gh0stlyKn1ght](https://github.com/Gh0stlyKn1ght) — this repo lives at [Gh0stlyKn1ght/backtoengineering](https://github.com/Gh0stlyKn1ght/backtoengineering)
+- **Upstream**: forked from [iuliaferoli/backtoengineering](https://github.com/iuliaferoli/backtoengineering) by Iulia Feroli, creator of the Back To Engineering YouTube channel
+- Credit appears on the site itself: header repo button + footer copyright (MkDocs Material via `mkdocs.yml`), a GitHub button in the tree homepage HUD (`docs/index.html`), and the README Credits section
 
 ## Project Genesis
 
@@ -19,10 +25,12 @@ This document tracks the collaborative build process with Claude and the archite
 ## Technical Stack Selection
 
 ### Final Stack
-- **MkDocs with Material theme**: Content management and static site generation
+- **MkDocs with Material theme**: Content pages and static site generation
 - **Python build script** (`scripts/build_graph.py`): Frontmatter parser and graph validator
-- **Cytoscape.js + dagre layout**: Interactive dependency graph rendering
-- **GitHub Pages + GitHub Actions**: Zero-cost hosting with auto-deploy on push
+- **Standalone tree page** (`docs/index.html`): Custom renderer using ELK (elkjs) for layered layout, HTML cards for nodes, one SVG layer for edges, custom pan/zoom — served as the homepage
+- **MkDocs hooks** (`scripts/hooks.py`): YouTube embeds + auto-generated "Next in the tree" links on every content page
+- **GitHub Pages + GitHub Actions**: Zero-cost hosting with auto-deploy on push, custom domain `www.backtoengineering.com` (CNAME)
+- **Umami analytics** (optional): injected at deploy time from repo variables; local builds need no credentials
 
 ### Why Not Hugo?
 Hugo is written in Go, but users write Go templates (a quirky mini-language), not Go code. Since the maintainer knows Python best, MkDocs with Jinja2-like templates is more accessible. Hugo's popularity doesn't translate to editability for this use case.
@@ -33,6 +41,11 @@ Pelican works but has a small, semi-abandoned plugin ecosystem. MkDocs Material 
 ### Why Not Astro?
 Astro's content collections would handle frontmatter validation natively, and interactive islands would simplify the graph page. However, it requires the Node ecosystem. Python comfort was prioritized for long-term maintainability.
 
+### Renderer history: Cytoscape → custom ELK page
+The first version rendered the tree with Cytoscape.js + dagre inside a normal MkDocs page (`docs/js/tech-tree.js`). It was replaced by a standalone full-page renderer (`docs/index.html`, no MkDocs theme) because the site needed: group boxes around ecosystems (ROS 2, NVIDIA, Python foundations, hardware…), era/tier partitioning, HTML node cards with icons and video counts, an info side panel, and a Civ-style HUD (brand, legend, zoom, horizontal scrollbar). ELK's layered algorithm with partitions handles all of that; Cytoscape/dagre did not.
+
+**`docs/js/tech-tree.js` is legacy and no longer loaded anywhere** — nothing in `mkdocs.yml` or any page references it. Safe to delete whenever.
+
 ## Architecture
 
 ### Content as Data
@@ -40,12 +53,16 @@ Every topic and project is a Markdown file with YAML frontmatter:
 
 ```yaml
 ---
-id: slam                       # stable unique identifier
+id: slam                       # stable unique identifier — never rename
 title: SLAM
 type: topic                    # topic | project
-category: ai-ml               # for color coding
+category: ai-ml                # drives node color (see categories below)
+tree_icon: map-2               # Tabler icon name (tabler.io/icons), optional
+group: ros-ecosystem           # optional: draws a labeled box around members
 prerequisites: [ros2-basics, linear-algebra]
-video: https://youtu.be/...   # optional
+videos:                        # optional; single `video:` key also works
+  - https://youtu.be/...
+thumbnail: https://...         # optional
 ---
 ```
 
@@ -53,281 +70,173 @@ video: https://youtu.be/...   # optional
 
 ### Build Pipeline
 
-1. **Content scan**: `build_graph.py` recursively reads all `.md` files in `docs/topics/` and `docs/projects/`
-2. **Frontmatter parsing**: Extracts YAML metadata using PyYAML
-3. **Validation**:
-   - All required fields present (`id`, `title`, `type`)
-   - No duplicate IDs
-   - All prerequisites reference existing IDs
-   - No circular dependencies (cycle detection via DFS)
-   - Build fails loudly if any validation fails (catches typos before deployment)
-4. **Graph generation**: Writes `docs/assets/graph.json` with Cytoscape-compatible node/edge format
-5. **Static site build**: MkDocs generates HTML from Markdown
+1. **Content scan**: `build_graph.py` reads all `.md` files in `docs/topics/` and `docs/projects/`
+2. **Frontmatter parsing**: PyYAML
+3. **Validation**: required fields, no duplicate IDs, all prerequisites exist, no cycles (iterative DFS), valid types. Build fails loudly on any error
+4. **Graph generation**: writes `docs/assets/graph.json` — per node: id, label, type, category, icon, group, blurb (first body paragraph), videoCount, tier (longest prerequisite chain), prereqCount, url; plus source→target edges
+5. **Static site build**: `mkdocs build --strict` (fails on broken links/warnings)
 
-### Graph Renderer
+### MkDocs Hooks (`scripts/hooks.py`)
+Runs on every page at build time:
+- **Video embeds**: `videos:`/`video:` frontmatter renders privacy-friendly `youtube-nocookie` players, at a `<!-- videos -->` marker or in an appended "Watch" section. Playlists supported
+- **"See in tree" link**: every node page links back to the homepage with its node selected (`/?node=<id>`)
+- **"Next in the tree" section**: successor links computed from `graph.json`, sorted by tier — the tree structure drives page-to-page navigation automatically
+- All injected links carry Umami event attributes
 
-`docs/js/tech-tree.js` runs only on pages containing `<div id="tech-tree">` (the homepage):
-- Fetches `graph.json` via AJAX
-- Instantiates Cytoscape with dagre layout (left-to-right, prerequisites → unlocks)
-- Styles nodes by category (color-coded branches like Civilization VI)
-- Projects are hexagons, topics are rounded rectangles
-- Click → navigate to page URL
-- Hover → highlight incoming prerequisite edges
+### Tree Renderer (`docs/index.html` — the homepage)
+Standalone HTML page, copied verbatim by MkDocs (listed in `not_in_nav`). `docs/tree/index.html` is just a redirect to `/` kept for old links.
 
-**Layout algorithm**: dagre automatically arranges nodes by dependency depth, creating "eras" without manual tier assignment. 21 nodes currently span 9 columns.
+- **Layout**: ELK (elkjs 0.9.3 from CDN) layered algorithm, left-to-right; `tier` values become ELK partitions ("eras"); `group` values become ELK hierarchy nodes rendered as labeled boxes (labels in `GROUP_LABELS` — add an entry when introducing a new group id)
+- **Nodes**: HTML cards with Tabler icons, category color, video count; projects styled distinctly
+- **Edges**: single SVG layer with orthogonal routes from ELK
+- **Interaction**: custom pan/zoom, horizontal scrollbar, hover highlights prerequisite chains, click opens an info panel (blurb, prereq/unlock chips, "Read" button), `?node=<id>` deep-links
+- **HUD**: brand badge, GitHub button (maintainer credit), About link, category legend, zoom controls; responsive rules for <720px
+- Category colors live in `:root` CSS variables at the top of the file
 
-### Deployment
-
-GitHub Actions workflow on every push to `main`:
-1. Install uv and sync dependencies from `pyproject.toml`
-2. Run `build_graph.py` (CI fails if graph is invalid)
-3. Run `mkdocs build --strict` (CI fails on broken links or warnings)
-4. Deploy to GitHub Pages
+### Deployment (`.github/workflows/deploy.yml`)
+On every push to `main` (plus manual dispatch):
+1. Setup Python 3.13 + uv (cached)
+2. `uv sync`
+3. `uv run python scripts/build_graph.py` — CI fails if the graph is invalid
+4. `uv run python scripts/write_analytics_config.py` — writes `docs/js/analytics-config.js` from `UMAMI_SCRIPT_URL` / `UMAMI_WEBSITE_ID` / `UMAMI_DOMAINS` repo variables (empty locally; analytics simply stay off)
+5. `uv run mkdocs build --strict`
+6. Upload + deploy to GitHub Pages
 
 Zero servers, zero maintenance, zero cost.
 
-**Dependency Management**: Uses [uv](https://docs.astral.sh/uv/) for fast, reliable Python dependency management. `pyproject.toml` defines dependencies, `uv.lock` pins exact versions.
-
 ## Content Structure (As Built)
 
-**21 nodes** across **5 categories**:
+**43 nodes** (36 topics, 7 projects), **71 edges**, single root (`curiosity`), deepest path 14 tiers (Curiosity → Open Duck Mini).
 
-- **Core** (indigo): `curiosity` (the root node)
-- **Electronics** (amber): `electronics-fundamentals`, `logic-gates`, `circuits`
-- **Mechanical** (grey): `mechanical-fundamentals`, `cad`, `3d-printing`
-- **Programming** (green): `python-basics`, `cpp-basics`, `data-fundamentals`
-- **Data Science** (purple): `statistics-modelling`
-- **AI & ML** (red): `ml-fundamentals`, `neural-networks`, `computer-vision`, `nlp`, `llms`, `ai-agents`, `vla` (vision-language-action)
+By category: AI & ML 17 · Programming 10 · Electronics 8 · Mechanical 4 · Data Science 3 · Core 1.
 
-**3 projects**:
-- `blink-led`: Requires `circuits`
-- `print-a-gearbox`: Requires `cad`, `3d-printing`
-- `object-sorter`: Requires `blink-led`, `computer-vision` (bridges electronics and AI)
+**Grouped ecosystems** (rendered as boxes on the tree):
+- `python-foundations`: python-variables, python-loops, python-classes, python-basics
+- `ros-ecosystem`: ros2-basics, ros2-communication, ros2-packages-launch
+- `nvidia-ecosystem`: gpu, cuda-basics, tensorrt, deepstream, simulation (Isaac Sim)
+- `hardware`: power-systems, microcontrollers, sensors, motor-control
+- `data-science`: data-fundamentals, statistics-modelling, ml-fundamentals, neural-networks, computer-vision
+- `agentic-AI`: llms, rag, ai-agents
+
+**7 projects**: blink-led, sensor-station, robot-arm (7-episode LeRobot series), so101, robot-car, robot-dog (quadruped), open-duck (Open Duck Mini).
 
 ### Design Notes on Dependencies
-
-- **Granularity**: Small concepts (e.g., "resistance, shorting, power, ground") are checklists inside topic pages, not individual nodes. Civilization has ~70 chunky nodes, not 500 tiny ones. Every node is a page to maintain.
-- **Projects as prerequisites**: `object-sorter` requires the `blink-led` project. This mirrors Civilization's structure (some techs require building specific units/buildings). Pedagogically: hands-on experience is sometimes a prerequisite for advanced theory.
-- **Category colors**: Each branch has a distinct color, visible in both the graph legend and node fill. Dark mode support works automatically via Material theme's CSS variables.
+- **Granularity**: small concepts are checklists inside topic pages ("You can move on when you can..."), not individual nodes. Civilization has ~70 chunky nodes, not 500 tiny ones
+- **Projects as prerequisites**: e.g. sensor-station requires the blink-led project; robot-arm requires sensor-station. Hands-on experience gates advanced work
+- **Category colors**: distinct color per branch, in both the legend and node styling
 
 ## Phase 2 Upgrade Path
 
 **Goal**: Track user progress (mark topics completed, show what's unlocked).
 
 ### Phase 2a: localStorage (still fully static)
-- Add a checkbox to each topic page
-- Clicking stores the topic ID in `localStorage`
-- Homepage JS reads the stored IDs and grays out/highlights completed nodes
-- **Zero backend**, maybe an afternoon of work
-- **No migration needed**: same stable IDs, same graph structure
+- Checkbox on each topic page stores the topic ID in `localStorage`
+- Tree page reads stored IDs and highlights completed/unlocked nodes
+- Zero backend; no migration needed (same stable IDs, same graph.json)
 
 ### Phase 2b: Real accounts (minimal backend)
-- Swap localStorage for a tiny hosted backend (Supabase, Pocketbase)
-- Backend stores "set of completed IDs per user"
-- Site itself stays static; only progress sync talks to the backend
-- **No content migration**: Markdown files unchanged, graph.json unchanged
+- Swap localStorage for a tiny hosted backend (Supabase, Pocketbase) storing "set of completed IDs per user"
+- Site stays static; only progress sync talks to the backend
 
 **Nothing built in phase 1 gets thrown away.**
 
 ## Developer Workflow
 
 ### Adding Content
-1. Create `docs/topics/my-topic.md` or `docs/projects/my-project.md`
-2. Fill in frontmatter (copy from existing file as template)
-3. Run `uv run python scripts/build_graph.py` locally (validates immediately)
-4. Optional: `uv run mkdocs serve` to preview at `http://127.0.0.1:8000`
-5. Push to GitHub → auto-deploy
+1. Create `docs/topics/my-topic.md` or `docs/projects/my-project.md` (copy frontmatter from an existing file)
+2. Add the page to `nav:` in `mkdocs.yml`
+3. If introducing a **new** `group:` id, add a label to `GROUP_LABELS` in `docs/index.html`
+4. Run `uv run python scripts/build_graph.py` (validates immediately)
+5. Optional: `uv run mkdocs serve` to preview at `http://127.0.0.1:8000`
+6. Push to GitHub → auto-deploy
 
-**The graph updates itself.** No manual node placement, no separate graph editor, no config file to update.
-
-### Editing Dependencies
-Change one word in one frontmatter field:
-```yaml
-prerequisites: [old-prereq]  →  prerequisites: [new-prereq]
-```
-Re-run the build script. If `new-prereq` doesn't exist, the build fails with a clear error.
+**The tree lays itself out.** No manual node placement.
 
 ### Local Testing
 ```bash
-uv sync                                # install dependencies from pyproject.toml
-uv run python scripts/build_graph.py   # validates and writes graph.json
-uv run mkdocs serve                    # live preview with hot reload
+uv sync                                # install dependencies
+uv run python scripts/build_graph.py   # validate and write graph.json
+uv run mkdocs build --strict           # what CI runs
+uv run mkdocs serve                    # live preview
 ```
 
 ## Validation Features
 
-The build script catches these errors **before deployment**:
-- Missing required frontmatter fields
-- Duplicate IDs
-- Typo'd prerequisite IDs (references to non-existent nodes)
-- Circular dependencies (A requires B, B requires C, C requires A)
-- Invalid node types (must be `topic` or `project`)
+`build_graph.py` catches before deployment: missing frontmatter fields, duplicate IDs, typo'd prerequisite IDs, circular dependencies, invalid node types. `mkdocs build --strict` catches broken links.
 
 **Philosophy**: Fail loudly at build time, never ship a broken graph.
 
-## Technology Choices Deep Dive
-
-### Why Cytoscape.js?
-- **Mature**: 10+ years, huge ecosystem, production-ready
-- **dagre layout**: Hierarchical graph layout (left-to-right flow) built-in via plugin
-- **Interactivity**: Click, hover, zoom, pan out of the box
-- **Lightweight**: ~200KB minified (loaded from CDN)
-
-**Alternatives considered**:
-- **Mermaid**: Too limited for interactivity (text-to-flowchart, no click handlers)
-- **D3.js**: Overkill; would require writing the entire layout algorithm from scratch
-- **vis.js**: Comparable to Cytoscape but smaller community
-
-### Why MkDocs Material?
-- **Largest MkDocs theme** by community size (critical for long-term support)
-- **Search, dark mode, navigation, mobile** all built-in
-- **Markdown extensions**: Admonitions, tabs, code highlighting pre-configured
-- **Zero JavaScript config**: Material handles responsive navigation, search indexing
-
-### Why Static?
-- **Cost**: GitHub Pages is free forever
-- **Speed**: Pre-rendered HTML, served from CDN (Cloudflare via GitHub Pages)
-- **Security**: No backend = no SQL injection, no auth vulnerabilities, no server patches
-- **Reliability**: No database to crash, no API rate limits
-- **Maintainability**: Push Markdown file → site updates. No database migrations, no deploy scripts.
-
-### Why Python for the Build Script?
-- Maintainer's strongest language
-- PyYAML (frontmatter parsing) and pathlib (file operations) are batteries-included
-- 200 lines including validation, error handling, and comments
-- Could be rewritten in 50 lines of Node/Deno if the stack shifts later (graph.json format is language-agnostic)
-
-### Why uv for Dependency Management?
-- **Fast**: 10-100x faster than pip for dependency resolution and installation
-- **Reliable**: Lockfile (`uv.lock`) ensures reproducible builds across dev/CI
-- **Simple**: Single `pyproject.toml` for dependencies, no separate `requirements.txt`
-- **Modern**: PEP 621 compliant, compatible with standard Python packaging tools
-- **Zero config**: Works out of the box, no virtual environment activation needed with `uv run`
-
 ## Known Limitations & Future Considerations
 
-### MkDocs 2.0 Breaking Changes
-MkDocs Material team has warned that MkDocs 2.0 will introduce breaking changes with no migration path. Current mitigation: `pyproject.toml` pins `mkdocs<2.0`. Before upgrading, review the Material team's migration guide.
-
-### Manual Navigation Ordering
-Pages must be listed in `mkdocs.yml`'s `nav:` section to control sidebar order. Alternative: the `awesome-pages` plugin auto-generates nav from folder structure but adds a dependency. Current choice: manual for explicitness.
-
-### CDN Dependencies
-Cytoscape and dagre load from CDNs (`cdnjs.cloudflare.com`, `jsdelivr.net`). If offline access or zero external dependencies are required, vendor the libraries into `docs/js/`. One-line change in `mkdocs.yml`'s `extra_javascript`.
-
-### Mobile Experience
-The graph is functional on mobile (touch to tap, pinch to zoom) but small screens compress 21 nodes into a tiny viewport. Future improvement: collapsible categories or a simplified mobile view.
-
-### Search Doesn't Index Graph Metadata
-MkDocs search indexes page content but not frontmatter fields. Searching for "requires kinematics" won't find pages listing kinematics as a prerequisite. Phase 2 could add a "search prerequisites" feature if needed.
-
-## Content Gaps (Not Yet Implemented)
-
-From the original sketch, the following are stubs or missing:
-- **ROS2 branch**: Not in the current tree (wasn't on the sketch provided). Would hang off Programming and Electronics.
-- **Robotics hardware topics**: Motors, sensors, microcontrollers, power systems (to be added).
-- **Project videos**: Optional `video:` field exists in frontmatter but no pages use it yet.
-- **Embedded video snippets**: Commented-out YouTube embed template exists in sample files but not activated.
+- **MkDocs 2.0**: the Material team has flagged MkDocs 2.0 as a breaking rewrite with no migration path (theme overrides break, closed contribution model). `pyproject.toml` pins `mkdocs==1.6.1` and `mkdocs-material==9.7.6`. Do not upgrade without reading their analysis: https://squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0/
+- **Manual nav ordering**: pages must be listed in `mkdocs.yml` `nav:`; chosen over auto-nav plugins for explicitness
+- **CDN dependencies**: elkjs and Tabler icons load from CDNs. Vendor into `docs/js/` if offline builds are ever needed
+- **Mobile**: the tree page has responsive HUD/info-panel rules and touch pan/zoom, but 43 nodes remain dense on phones
+- **Search doesn't index frontmatter**: searching "requires kinematics" won't find dependents
+- **Legacy file**: `docs/js/tech-tree.js` (old Cytoscape renderer) is unused and can be deleted
 
 ## Testing Strategy
 
-**Build-time validation**: `build_graph.py` is the test suite. If it writes `graph.json`, the graph is valid.
-
-**Headless graph verification**: During initial build, Cytoscape was run in headless Node.js to verify:
-- `graph.json` parses correctly
-- dagre layout executes without errors
-- 21 nodes arrange into 9 columns (dependency depth)
-- Single root node (Curiosity) at column 0
-
-**Smoke test command**:
-```bash
-uv run python scripts/build_graph.py && echo "Graph valid"
-```
+- **Build-time validation is the test suite**: if `build_graph.py` writes `graph.json` and `mkdocs build --strict` passes, the site is shippable — CI runs both on every push
+- Smoke test: `uv run python scripts/build_graph.py && uv run mkdocs build --strict`
 
 ## Inspiration & Design References
 
-**Civilization VI tech tree**: Primary UX reference for:
-- Left-to-right flow (ancient → modern)
-- Category colors (civics blue, tech orange)
-- Node states (not yet available, available, researched)
-- Swim lanes for parallel branches
-
-**User sketch**: Hand-drawn robotics dependency graph with 5 swim lanes:
-- Electronics (circuits, logic gates)
-- Mechanical (CAD, 3D printing)
-- Programming (Python, C++)
-- Data Science (statistics, modeling)
-- AI & ML (ML fundamentals → neural networks → vision/NLP → LLMs → agents → VLA)
+**Civilization VI tech tree**: left-to-right eras, category colors, chunky nodes, projects as prerequisites, group boxes as "districts" of related techs.
 
 ## File Structure Summary
 
 ```
-techtree/
-├── .github/workflows/deploy.yml    # CI: validate graph → build → deploy
+backtoengineering/
+├── .github/workflows/deploy.yml       # CI: uv sync → validate graph → analytics config → strict build → Pages
 ├── docs/
-│   ├── assets/graph.json           # Generated: Cytoscape data (nodes + edges)
-│   ├── js/tech-tree.js             # Graph renderer (Cytoscape + dagre)
-│   ├── index.md                    # Homepage with graph embed
-│   ├── topics/*.md                 # 18 topic pages with frontmatter
-│   └── projects/*.md               # 3 project pages with frontmatter
-├── scripts/build_graph.py          # Frontmatter → graph.json with validation
-├── mkdocs.yml                      # MkDocs config (theme, nav, extensions)
-├── pyproject.toml                  # Python dependencies (PEP 621 format)
-├── uv.lock                         # Lockfile for reproducible builds
-└── README.md                       # User-facing setup/usage guide
+│   ├── index.html                     # THE tree page (homepage): ELK layout, HTML cards, custom pan/zoom, HUD
+│   ├── tree/index.html                # redirect to / (kept for old links)
+│   ├── about.md                       # "how this works" page
+│   ├── CNAME                          # www.backtoengineering.com
+│   ├── assets/graph.json              # generated by build_graph.py — do not edit by hand
+│   ├── assets/branding/               # logos
+│   ├── css/custom.css                 # Material theme tweaks (next-node buttons, video embeds…)
+│   ├── js/analytics-config.js         # generated at deploy; empty values locally
+│   ├── js/site-analytics.js           # Umami loader + custom events
+│   ├── js/tech-tree.js                # LEGACY (unused Cytoscape renderer)
+│   ├── topics/*.md                    # 36 topic pages with frontmatter
+│   └── projects/*.md                  # 7 project pages with frontmatter
+├── scripts/
+│   ├── build_graph.py                 # frontmatter → graph.json with validation
+│   ├── hooks.py                       # MkDocs hooks: video embeds, "Next in the tree", "See in tree"
+│   └── write_analytics_config.py      # env vars → analytics-config.js
+├── mkdocs.yml                         # theme, nav, repo_url/copyright credit, hooks, extras
+├── pyproject.toml + uv.lock           # pinned deps (Python ≥3.13, mkdocs 1.6.1, material 9.7.6)
+└── README.md                          # setup/usage guide + credits
 ```
 
 ## Lessons Learned
 
-1. **SSG is interchangeable; unique features are not**: The tech tree differentiates the site, not MkDocs. Any SSG could serve the content; the graph is the complexity budget.
-
-2. **Stable IDs are the skeleton**: Everything else (titles, content, even URLs) can change. IDs cannot. They're the foreign key for progress tracking and the graph structure.
-
-3. **Validate early, validate loud**: Build-time validation catches 90% of content errors. Better to fail in CI than ship a broken prerequisite link.
-
-4. **Manual beats automatic when the domain is small**: 21 nodes × 1 maintainer = manual frontmatter is fine. At 200 nodes or 5 contributors, a CMS or validation UI becomes worth it.
-
-5. **Future-proofing is cheap when the data model is right**: Phase 2 progress tracking requires zero changes to the content files. The `id` field was the entire investment.
-
-6. **Civilization VI was the right reference**: Chunky nodes, color-coded branches, left-to-right flow, projects as prerequisites. All direct mappings from the game's UX.
+1. **SSG is interchangeable; unique features are not**: the tree page is the complexity budget, and it eventually outgrew off-the-shelf graph libraries — the custom ELK renderer earns its ~1000 lines
+2. **Stable IDs are the skeleton**: titles, content, even URLs can change; IDs cannot. They're the foreign key for progress tracking, the hooks, and the graph
+3. **Validate early, validate loud**: build-time validation catches content errors before CI deploys them
+4. **Derive navigation from data**: "Next in the tree" links are computed from graph.json at build time — adding an edge updates every affected page automatically
+5. **Future-proofing is cheap when the data model is right**: phase 2 progress tracking requires zero changes to content files
 
 ## Next Steps (Proposed)
 
-1. **Add ROS2 branch**: `ros2-basics`, `ros2-navigation`, `ros2-manipulation` (depends on Programming + Electronics)
-2. **Hardware topics**: `microcontrollers`, `motor-control`, `sensors`, `power-systems`
-3. **Flesh out checklists**: Current topic pages are stubs; expand "you can move on when..." lists
-4. **Embed videos**: Activate the commented-out YouTube embed snippets for topics with video content
-5. **Mobile testing**: Verify graph usability on phones/tablets, consider collapsible categories
-6. **Real deployment**: Update `site_url` in `mkdocs.yml`, push to GitHub, enable Pages in repo settings
-7. **Content from videos**: Link existing YouTube tutorial videos via the `video:` frontmatter field
+1. **Phase 2a**: localStorage progress tracking (checkbox per topic, completed/unlocked states on the tree)
+2. **Flesh out stub topics**: most topic pages are short checklists; expand explanations and link videos via `videos:` frontmatter
+3. **Delete legacy `docs/js/tech-tree.js`** and drop the stale renderer mentions from README
+4. **Clean up `docs/assets/`**: stray `Iulia's YouTube library_.md` files and duplicate logo copies
+5. **Mobile polish**: collapsible groups or a simplified phone view for the tree
 
 ## Claude's Role in This Build
 
-Claude generated:
-- Complete working skeleton (MkDocs config, build script, graph renderer, sample content, CI workflow)
-- 21 topic/project stubs from hand-drawn sketch
-- Validation logic (duplicate IDs, typo'd prerequisites, cycle detection)
-- Headless Cytoscape smoke test
-- Category color system with legend
-- Civilization VI-style design decisions
-- This documentation
+Claude generated: the original MkDocs/Cytoscape skeleton, the build/validation script, content stubs, CI workflow, the hardware topic branch, GitHub credit integration, and this documentation. The custom ELK tree renderer, analytics pipeline, video/next-node hooks, and the full content expansion (ROS 2, NVIDIA, Python foundations, agentic AI branches, 7 projects) were built on top of that skeleton.
 
-Human provided:
-- Requirements (static, Python, single maintainer, progress tracking future)
-- UX reference (Civ VI tech tree screenshots)
-- Domain expertise (robotics/AI dependency sketch)
-- Design constraints (simplicity, maintainability)
+Human provided: requirements (static, Python, single maintainer), UX reference (Civ VI), domain expertise (robotics/AI dependency structure), content, and branding.
 
 ## Build Metadata
 
-- **Initial build**: 2026-07-12
-- **Current node count**: 21 (18 topics, 3 projects)
-- **Dependency edges**: 24
-- **Graph depth**: 9 columns (Curiosity → VLA is longest path)
-- **Technologies**: Python 3.13, uv 0.5+, MkDocs 1.6.1, Material 9.7.6, Cytoscape 3.30.2, dagre 0.8.5
-- **Dependency management**: uv with `pyproject.toml` + `uv.lock`
-- **Lines of code** (excluding content):
-  - `build_graph.py`: 191 lines
-  - `tech-tree.js`: 136 lines
-  - `mkdocs.yml`: 42 lines
-  - Total custom code: ~370 lines
+- **Initial build**: 2026-07-12 · **Last doc update**: 2026-07-16
+- **Nodes**: 43 (36 topics, 7 projects) · **Edges**: 71 · **Depth**: 14 tiers (Curiosity → Open Duck Mini)
+- **Groups**: python-foundations, ros-ecosystem, nvidia-ecosystem, hardware, data-science, agentic-AI
+- **Technologies**: Python 3.13, uv, MkDocs 1.6.1, Material 9.7.6, elkjs 0.9.3, Tabler Icons
+- **Custom code**: `build_graph.py` ~240 lines · `hooks.py` ~120 lines · `docs/index.html` ~1000 lines (renderer + styles) · `write_analytics_config.py` + `site-analytics.js`

@@ -78,3 +78,10 @@ When those variables are present, the deploy workflow injects the Umami
 tracker into the built pages. The site also sends custom events for
 tree navigation, next-node clicks, external links, video interactions,
 and tree node detail opens.
+
+## Credits
+
+Maintained by [Gh0stlyKn1ght](https://github.com/Gh0stlyKn1ght)
+([Gh0stlyKn1ght/backtoengineering](https://github.com/Gh0stlyKn1ght/backtoengineering)).
+Forked from [iuliaferoli/backtoengineering](https://github.com/iuliaferoli/backtoengineering)
+by Iulia Feroli, creator of the Back To Engineering YouTube channel.

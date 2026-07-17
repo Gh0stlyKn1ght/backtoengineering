@@ -227,6 +227,21 @@
     },
     {
       "data": {
+        "id": "microcontrollers",
+        "label": "Microcontrollers",
+        "type": "topic",
+        "category": "electronics",
+        "icon": "cpu-2",
+        "group": "hardware",
+        "blurb": "Arduino, Raspberry Pi Pico, ESP32: tiny computers that read pins and run your code on bare metal. The bridge between the code you write and the circuits you build.",
+        "videoCount": 0,
+        "tier": 5,
+        "prereqCount": 2,
+        "url": "topics/microcontrollers/"
+      }
+    },
+    {
+      "data": {
         "id": "ml-fundamentals",
         "label": "ML Fundamentals",
         "type": "topic",
@@ -238,6 +253,21 @@
         "tier": 7,
         "prereqCount": 1,
         "url": "topics/ml-fundamentals/"
+      }
+    },
+    {
+      "data": {
+        "id": "motor-control",
+        "label": "Motor Control",
+        "type": "topic",
+        "category": "electronics",
+        "icon": "engine",
+        "group": "hardware",
+        "blurb": "Servos, DC motors, steppers, and the driver boards that let a 3.3V pin command amps of current. Motion is what separates a robot from a sensor station.",
+        "videoCount": 0,
+        "tier": 6,
+        "prereqCount": 2,
+        "url": "topics/motor-control/"
       }
     },
     {
@@ -268,6 +298,21 @@
         "tier": 9,
         "prereqCount": 1,
         "url": "topics/nlp/"
+      }
+    },
+    {
+      "data": {
+        "id": "power-systems",
+        "label": "Power Systems",
+        "type": "topic",
+        "category": "electronics",
+        "icon": "battery-charging",
+        "group": "hardware",
+        "blurb": "Batteries, voltage regulators, and current budgets. The unglamorous topic that decides whether your robot runs for an hour or browns out the instant a motor spins up.",
+        "videoCount": 0,
+        "tier": 2,
+        "prereqCount": 1,
+        "url": "topics/power-systems/"
       }
     },
     {
@@ -388,6 +433,21 @@
         "tier": 7,
         "prereqCount": 1,
         "url": "topics/ros2-packages-launch/"
+      }
+    },
+    {
+      "data": {
+        "id": "sensors",
+        "label": "Sensors",
+        "type": "topic",
+        "category": "electronics",
+        "icon": "wave-sine",
+        "group": "hardware",
+        "blurb": "Ultrasonic, IMU, temperature, encoders: how a robot perceives the world. Every autonomous behavior starts with a measurement.",
+        "videoCount": 0,
+        "tier": 6,
+        "prereqCount": 1,
+        "url": "topics/sensors/"
       }
     },
     {
@@ -520,8 +580,8 @@
         "group": null,
         "blurb": "Build a robot arm from scratch, progressing from cardboard prototypes to 3D-printed designs with AI-powered control using LeRobot.",
         "videoCount": 1,
-        "tier": 7,
-        "prereqCount": 6,
+        "tier": 8,
+        "prereqCount": 7,
         "url": "projects/robot-arm/"
       }
     },
@@ -550,7 +610,7 @@
         "group": null,
         "blurb": "Build a four-legged robot dog capable of dynamic walking, running, and adaptive terrain navigation using advanced kinematics and gait control.",
         "videoCount": 1,
-        "tier": 8,
+        "tier": 9,
         "prereqCount": 5,
         "url": "projects/robot-dog/"
       }
@@ -565,8 +625,8 @@
         "group": null,
         "blurb": "Read the physical world: wire up sensors (temperature, distance, IMU), stream their readings into Python, and visualize live data. The graduation step between making an output (blinking an LED) and making a system that s\u2026",
         "videoCount": 1,
-        "tier": 6,
-        "prereqCount": 2,
+        "tier": 7,
+        "prereqCount": 3,
         "url": "projects/sensor-station/"
       }
     },
@@ -685,8 +745,32 @@
     },
     {
       "data": {
+        "source": "circuits",
+        "target": "microcontrollers"
+      }
+    },
+    {
+      "data": {
+        "source": "python-basics",
+        "target": "microcontrollers"
+      }
+    },
+    {
+      "data": {
         "source": "statistics-modelling",
         "target": "ml-fundamentals"
+      }
+    },
+    {
+      "data": {
+        "source": "microcontrollers",
+        "target": "motor-control"
+      }
+    },
+    {
+      "data": {
+        "source": "power-systems",
+        "target": "motor-control"
       }
     },
     {
@@ -699,6 +783,12 @@
       "data": {
         "source": "neural-networks",
         "target": "nlp"
+      }
+    },
+    {
+      "data": {
+        "source": "electronics-fundamentals",
+        "target": "power-systems"
       }
     },
     {
@@ -753,6 +843,12 @@
       "data": {
         "source": "ros2-basics",
         "target": "ros2-packages-launch"
+      }
+    },
+    {
+      "data": {
+        "source": "microcontrollers",
+        "target": "sensors"
       }
     },
     {
@@ -883,6 +979,12 @@
     },
     {
       "data": {
+        "source": "motor-control",
+        "target": "robot-arm"
+      }
+    },
+    {
+      "data": {
         "source": "kinematics",
         "target": "robot-arm"
       }
@@ -913,7 +1015,7 @@
     },
     {
       "data": {
-        "source": "circuits",
+        "source": "motor-control",
         "target": "robot-car"
       }
     },
@@ -950,6 +1052,12 @@
     {
       "data": {
         "source": "blink-led",
+        "target": "sensor-station"
+      }
+    },
+    {
+      "data": {
+        "source": "sensors",
         "target": "sensor-station"
       }
     },

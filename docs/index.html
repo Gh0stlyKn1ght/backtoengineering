@@ -264,6 +264,16 @@
     transition: color 0.15s, border-color 0.15s;
   }
   #docs-link:hover { color: var(--text); border-color: var(--accent); }
+  #gh-link {
+    top: 24px; right: 104px;
+    color: var(--text-dim); text-decoration: none; font-size: 15px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    padding: 6px 11px; border-radius: 8px;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex; align-items: center;
+  }
+  #gh-link:hover { color: var(--text); border-color: var(--accent); }
   #legend {
     bottom: 40px; left: 24px;
     display: flex; flex-wrap: wrap; gap: 6px 14px;
@@ -323,6 +333,12 @@
       padding: 7px 10px;
       font-size: 11px;
     }
+    #gh-link {
+      top: calc(14px + env(safe-area-inset-top));
+      right: calc(76px + env(safe-area-inset-right));
+      padding: 5px 9px;
+      font-size: 13px;
+    }
     #info {
       top: auto;
       left: calc(12px + env(safe-area-inset-left));
@@ -359,6 +375,7 @@
     <div class="sub">PHYSICAL AI · TECH TREE</div>
   </div>
 </div>
+<a class="hud" id="gh-link" href="https://github.com/Gh0stlyKn1ght/backtoengineering" target="_blank" rel="noopener" aria-label="GitHub repository" title="Gh0stlyKn1ght on GitHub"><i class="ti ti-brand-github"></i></a>
 <a class="hud" id="docs-link" href="about/">About</a>
 <div class="hud" id="legend"></div>
 <div class="hud" id="zoom">
@@ -411,7 +428,8 @@
   const GROUP_LABELS = {
     "nvidia-ecosystem": "NVIDIA Ecosystem",
     "ros-ecosystem": "ROS 2 Ecosystem",
-    "python-foundations": "Python Foundations"
+    "python-foundations": "Python Foundations",
+    "hardware": "Robot Hardware"
   };
   const CATEGORY_LABELS = {
     core: "Core", electronics: "Electronics", mechanical: "Mechanical",
